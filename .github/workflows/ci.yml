@@ -1,0 +1,24 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests/ -q
+
+      # The harness must run end to end on a machine with no model installed.
+      # If this breaks, the repo stops being reproducible by a reviewer.
+      - name: benchmark smoke run
+        run: |
+          python -m bench.run --provider simulated --out bench_report.json
+          python -m bench.run --provider simulated --grammar-first --out bench_grammar.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-reports
+          path: bench_*.json

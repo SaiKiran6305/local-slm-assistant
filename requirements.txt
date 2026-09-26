@@ -1,0 +1,11 @@
+# Core -- required
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.0
+
+# Dev
+pytest>=7.4
+
+# Nothing else. No torch, no transformers, no model downloads.
+# Ollama is talked to over HTTP with the stdlib, so it is a runtime
+# dependency of your machine rather than a package here.
