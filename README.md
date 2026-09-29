@@ -1,6 +1,8 @@
 # local-slm-assistant
 
-**A 1B model gets 93% of the field values right and produces valid JSON 8% of the time. The gap between those two numbers is engineering, not a bigger model.**
+**Small local models often know the answer but fail to return valid JSON. This project measures those two failures separately and closes the gap with engineering, not a bigger model.**
+
+> **Status:** the benchmark harness is complete, but every number below comes from a *simulated* provider that models known failure modes. No real model has been benchmarked yet; `make bench-real` runs the same benchmark against models served by Ollama.
 
 Structured output from small local models, with a five rung repair ladder, grammar constrained decoding, and a benchmark that keeps *conformance* and *accuracy* strictly apart.
 
