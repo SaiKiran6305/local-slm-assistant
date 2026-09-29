@@ -1,6 +1,8 @@
 # local-slm-assistant
 
-**A 1B model gets 93% of the field values right and produces valid JSON 8% of the time. The gap between those two numbers is engineering, not a bigger model.**
+**Small local models often know the answer but fail to return valid JSON. This project measures those two failures separately and closes the gap with engineering, not a bigger model.**
+
+> **Status:** the benchmark harness is complete, but every number below comes from a *simulated* provider that models known failure modes. No real model has been benchmarked yet; `make bench-real` runs the same benchmark against models served by Ollama.
 
 Structured output from small local models, with a five rung repair ladder, grammar constrained decoding, and a benchmark that keeps *conformance* and *accuracy* strictly apart.
 
@@ -35,7 +37,7 @@ L3  GRAMMAR    regenerate under a GBNF grammar derived from     one more call,
 L4  ABSTAIN    return nothing rather than a guess               —
 ```
 
-**Reporting the distribution of rungs reached is the whole point.** `L0 8%, L1 75%, L2 17%` tells you cheap string repair is carrying the system and a bigger model would be wasted money. An average conformance figure tells you none of that.
+**Reporting the distribution of rungs reached is the whole point.** `L0 8%, L1 67%, L2 17%, L3 8%` tells you cheap string repair is carrying the system and a bigger model would be wasted money. An average conformance figure tells you none of that.
 
 **Salvage never invents data.** Every L1 transform is syntactic. It will strip a fence and fix a trailing comma; it will not supply a missing required field or coerce a wrong value into a right one. If repair could invent values, the conformance metric would be measuring the repairer rather than the model — `test_salvage_never_invents_data` pins this.
 
@@ -59,27 +61,36 @@ python -m bench.run --provider ollama --models llama3.2:3b --grammar-first  # gr
 
 > **The numbers below come from the simulated provider and describe the harness, not any real model.** Ollama's registry and HuggingFace were both unreachable from the environment this was built in, so no real inference has been run yet. Reproduce with real models using `make bench-real` — the report labels every run with its provider so the two can never be confused.
 
-Simulated, repair-after, 12 tasks:
+Simulated, repair-after, 12 tasks, seed 17 (`python -m bench.run --provider simulated`):
 
 | profile | conf raw | conf final | accuracy | end to end | calls | tok/s |
 |---|---:|---:|---:|---:|---:|---:|
-| sim-1b-q4 | 0.083 | **1.000** | 0.931 | 0.750 | 1.17 | 130 |
-| sim-3b-q4 | 0.167 | **1.000** | 0.951 | 0.750 | 1.25 | 78 |
-| sim-7b-q4 | 0.583 | **1.000** | 0.965 | 0.833 | 1.00 | 42 |
-| sim-7b-q8 | 0.667 | **1.000** | 1.000 | 1.000 | 1.08 | 24 |
+| sim-1b-q4 | 0.083 | **1.000** | 0.931 | 0.750 | 1.33 | 129 |
+| sim-3b-q4 | 0.083 | **1.000** | 0.951 | 0.750 | 1.33 | 78 |
+| sim-7b-q4 | 0.500 | **1.000** | 0.965 | 0.833 | 1.00 | 42 |
+| sim-7b-q8 | 0.500 | **1.000** | 1.000 | 1.000 | 1.08 | 24 |
 
 Repair level distribution — where the work actually happens:
 
 ```
-sim-1b-q4    L0:1   L1:9   L2:2
-sim-3b-q4    L0:2   L1:7   L2:3
-sim-7b-q4    L0:7   L1:5
-sim-7b-q8    L0:8   L1:3   L2:1
+sim-1b-q4    L0:1   L1:8   L2:2   L3:1
+sim-3b-q4    L0:1   L1:7   L2:4
+sim-7b-q4    L0:6   L1:6
+sim-7b-q8    L0:6   L1:5   L2:1
 ```
 
-Grammar-first on the same tasks lifts raw conformance to 1.000 and removes the extra model calls, at roughly 28% of decode throughput.
+Grammar-first on the same tasks (`--grammar-first`):
 
-**Read the accuracy column against the conformance column.** Accuracy barely moves across the range while raw conformance moves by 8x. The small models here largely know the answers; what they cannot do reliably is emit them in the requested shape. That is the case for spending effort on the output layer rather than on parameters.
+| profile | conf raw | conf final | accuracy | end to end | calls | tok/s |
+|---|---:|---:|---:|---:|---:|---:|
+| sim-1b-q4 | 0.833 | **1.000** | 0.972 | 0.833 | 1.17 | 97 |
+| sim-3b-q4 | 0.917 | **1.000** | 0.986 | 0.917 | 1.08 | 57 |
+| sim-7b-q4 | 1.000 | **1.000** | 0.965 | 0.833 | 1.00 | 30 |
+| sim-7b-q8 | 1.000 | **1.000** | 1.000 | 1.000 | 1.00 | 17 |
+
+Constraining first lifts raw conformance from 8–50% to 83–100% and cuts extra model calls, at roughly 72–75% of repair-after decode throughput. It also raises accuracy for the smaller profiles, because the grammar makes dropped and invented fields unrepresentable; wrong *values* still get through.
+
+**Read the accuracy column against the conformance column.** Accuracy barely moves across the range (0.93–1.00) while raw conformance moves by 6x. The small models here largely know the answers; what they cannot do reliably is emit them in the requested shape. That is the case for spending effort on the output layer rather than on parameters.
 
 ## Running it
 
